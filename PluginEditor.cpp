@@ -70,6 +70,35 @@ void UltimateShaperAudioProcessorEditor::paint(juce::Graphics& g)
                juce::Justification::centred);
 }
 
+void UltimateShaperAudioProcessorEditor::updateCurveFromMouse(float x, float y)
+{
+    const float left = 40.0f;
+    const float top = 110.0f;
+    const float width = 680.0f;
+    const float height = 300.0f;
+
+    if (x < left || x > left + width || y < top || y > top + height)
+        return;
+
+    int index = juce::jlimit(0, 15, (int)((x - left) / width * 16.0f));
+
+    float value = 1.0f - (y - top) / height;
+
+    audioProcessor.volumeCurve[index] = juce::jlimit(0.0f, 1.0f, value);
+
+    repaint();
+}
+
+void UltimateShaperAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
+{
+    updateCurveFromMouse((float)event.x, (float)event.y);
+}
+
+void UltimateShaperAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
+{
+    updateCurveFromMouse((float)event.x, (float)event.y);
+}
+
 void UltimateShaperAudioProcessorEditor::resized()
 {
 }
