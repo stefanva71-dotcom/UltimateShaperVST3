@@ -2,11 +2,15 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+#include <cmath>
+
 UltimateShaperAudioProcessor::UltimateShaperAudioProcessor()
     : AudioProcessor(BusesProperties()
         .withInput("Input", juce::AudioChannelSet::stereo(), true)
         .withOutput("Output", juce::AudioChannelSet::stereo(), true))
 {
+    for (auto& point : volumeCurve)
+        point.store(1.0f);
 }
 
 UltimateShaperAudioProcessor::~UltimateShaperAudioProcessor()
@@ -24,9 +28,11 @@ void UltimateShaperAudioProcessor::releaseResources()
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
-bool UltimateShaperAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+bool UltimateShaperAudioProcessor::isBusesLayoutSupported(
+    const BusesLayout& layouts) const
 {
-    return layouts.getMainInputChannelSet() == layouts.getMainOutputChannelSet();
+    return layouts.getMainInputChannelSet()
+        == layouts.getMainOutputChannelSet();
 }
 #endif
 
@@ -38,8 +44,8 @@ float UltimateShaperAudioProcessor::getVolumeAtPhase(float p) const
     int index = (int)position;
     float fraction = position - index;
 
-    float a = volumeCurve[index];
-    float b = volumeCurve[(index + 1) % 16];
+    float a = volumeCurve[index].load();
+    float b = volumeCurve[(index + 1) % 16].load();
 
     return a + (b - a) * fraction;
 }
@@ -52,7 +58,9 @@ void UltimateShaperAudioProcessor::processBlock(
 
     double bpm = 140.0;
 
-    if (auto* playHead = getPlayHead())
+    auto* playHead = getPlayHead();
+
+    if (syncEnabled.load() && playHead != nullptr)
     {
         if (auto position = playHead->getPosition())
         {
@@ -93,12 +101,16 @@ void UltimateShaperAudioProcessor::processBlock(
     }
 }
 
-juce::AudioProcessorEditor* UltimateShaperAudioProcessor::createEditor()
+juce::AudioProcessorEditor*
+UltimateShaperAudioProcessor::createEditor()
 {
     return new UltimateShaperAudioProcessorEditor(*this);
 }
 
-bool UltimateShaperAudioProcessor::hasEditor() const { return true; }
+bool UltimateShaperAudioProcessor::hasEditor() const
+{
+    return true;
+}
 
 const juce::String UltimateShaperAudioProcessor::getName() const
 {
@@ -108,13 +120,32 @@ const juce::String UltimateShaperAudioProcessor::getName() const
 bool UltimateShaperAudioProcessor::acceptsMidi() const { return false; }
 bool UltimateShaperAudioProcessor::producesMidi() const { return false; }
 bool UltimateShaperAudioProcessor::isMidiEffect() const { return false; }
-double UltimateShaperAudioProcessor::getTailLengthSeconds() const { return 0.0; }
+
+double UltimateShaperAudioProcessor::getTailLengthSeconds() const
+{
+    return 0.0;
+}
 
 int UltimateShaperAudioProcessor::getNumPrograms() { return 1; }
 int UltimateShaperAudioProcessor::getCurrentProgram() { return 0; }
 void UltimateShaperAudioProcessor::setCurrentProgram(int) {}
-const juce::String UltimateShaperAudioProcessor::getProgramName(int) { return {}; }
-void UltimateShaperAudioProcessor::changeProgramName(int, const juce::String&) {}
 
-void UltimateShaperAudioProcessor::getStateInformation(juce::MemoryBlock&) {}
-void UltimateShaperAudioProcessor::setStateInformation(const void*, int) {}
+const juce::String UltimateShaperAudioProcessor::getProgramName(int)
+{
+    return {};
+}
+
+void UltimateShaperAudioProcessor::changeProgramName(
+    int, const juce::String&)
+{
+}
+
+void UltimateShaperAudioProcessor::getStateInformation(
+    juce::MemoryBlock&)
+{
+}
+
+void UltimateShaperAudioProcessor::setStateInformation(
+    const void*, int)
+{
+}
