@@ -49,7 +49,19 @@ void UltimateShaperAudioProcessor::processBlock(
 {
     juce::ScopedNoDenormals noDenormals;
 
-    const double bpm = 140.0;
+    double bpm = 140.0;
+
+    if (auto* playHead = getPlayHead())
+    {
+        if (auto position = playHead->getPosition())
+        {
+            if (auto hostBpm = position->getBpm())
+                bpm = *hostBpm;
+        }
+    }
+
+    bpm = juce::jlimit(20.0, 300.0, bpm);
+
     const double cycleLength = 60.0 / bpm;
 
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
@@ -77,10 +89,7 @@ juce::AudioProcessorEditor* UltimateShaperAudioProcessor::createEditor()
     return new UltimateShaperAudioProcessorEditor(*this);
 }
 
-bool UltimateShaperAudioProcessor::hasEditor() const
-{
-    return true;
-}
+bool UltimateShaperAudioProcessor::hasEditor() const { return true; }
 
 const juce::String UltimateShaperAudioProcessor::getName() const
 {
