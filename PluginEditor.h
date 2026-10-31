@@ -1,25 +1,53 @@
-
 #pragma once
-
 #include <JuceHeader.h>
-#include "PluginProcessor.h"
+#include <array>
 
-class UltimateShaperAudioProcessorEditor : public juce::AudioProcessorEditor
+class UltimateShaperAudioProcessor : public juce::AudioProcessor
 {
 public:
-    explicit UltimateShaperAudioProcessorEditor(
-        UltimateShaperAudioProcessor&);
+    UltimateShaperAudioProcessor();
+    ~UltimateShaperAudioProcessor() override;
 
-    ~UltimateShaperAudioProcessorEditor() override;
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override;
 
-    void paint(juce::Graphics&) override;
-    void resized() override;
+#ifndef JucePlugin_PreferredChannelConfigurations
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+#endif
+
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+
+    juce::AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override;
+
+    const juce::String getName() const override;
+    bool acceptsMidi() const override;
+    bool producesMidi() const override;
+    bool isMidiEffect() const override;
+    double getTailLengthSeconds() const override;
+
+    int getNumPrograms() override;
+    int getCurrentProgram() override;
+    void setCurrentProgram(int index) override;
+    const juce::String getProgramName(int index) override;
+    void changeProgramName(int index, const juce::String& newName) override;
+
+    void getStateInformation(juce::MemoryBlock& destData) override;
+    void setStateInformation(const void* data, int sizeInBytes) override;
+
+    std::array<float, 16> volumeCurve {
+        1.0f, 0.0f, 1.0f, 0.0f,
+        1.0f, 0.0f, 1.0f, 0.0f,
+        1.0f, 0.0f, 1.0f, 0.0f,
+        1.0f, 0.0f, 1.0f, 0.0f
+    };
+
+    float getVolumeAtPhase(float phase) const;
 
 private:
-    UltimateShaperAudioProcessor& audioProcessor;
+    double currentSampleRate = 44100.0;
+    double phase = 0.0;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(
-        UltimateShaperAudioProcessorEditor
-    )
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(UltimateShaperAudioProcessor)
 };
 
