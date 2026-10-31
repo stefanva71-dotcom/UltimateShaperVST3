@@ -1,3 +1,4 @@
+
 #pragma once
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
@@ -17,7 +18,12 @@ public:
 private:
     UltimateShaperAudioProcessor& audioProcessor;
 
+    juce::TextButton resetButton { "RESET CURVE" };
+    juce::ToggleButton syncButton { "SYNC" };
+    juce::Label bpmLabel;
+
     void updateCurveFromMouse(float x, float y);
+    void resetCurve();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(UltimateShaperAudioProcessorEditor)
 };
