@@ -2,150 +2,138 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-#include <cmath>
-
-UltimateShaperAudioProcessor::UltimateShaperAudioProcessor()
-    : AudioProcessor(BusesProperties()
-        .withInput("Input", juce::AudioChannelSet::stereo(), true)
-        .withOutput("Output", juce::AudioChannelSet::stereo(), true))
+UltimateShaperAudioProcessorEditor::UltimateShaperAudioProcessorEditor(
+    UltimateShaperAudioProcessor& p)
+    : AudioProcessorEditor(&p), audioProcessor(p)
 {
-    for (auto& point : volumeCurve)
+    setSize(760, 540);
+
+    resetButton.onClick = [this]
+    {
+        resetCurve();
+    };
+
+    addAndMakeVisible(resetButton);
+
+    syncButton.setToggleState(true, juce::dontSendNotification);
+    syncButton.onClick = [this]
+    {
+        audioProcessor.syncEnabled.store(syncButton.getToggleState());
+    };
+    addAndMakeVisible(syncButton);
+
+    bpmLabel.setText("TEMPO: HOST SYNC", juce::dontSendNotification);
+    bpmLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    bpmLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(bpmLabel);
+}
+
+UltimateShaperAudioProcessorEditor::~UltimateShaperAudioProcessorEditor()
+{
+}
+
+void UltimateShaperAudioProcessorEditor::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colour(18, 20, 27));
+
+    g.setColour(juce::Colours::white);
+    g.setFont(28.0f);
+    g.drawText("ULTIMATE SHAPER", 20, 15, 720, 45,
+               juce::Justification::centred);
+
+    g.setColour(juce::Colour(120, 125, 140));
+    g.setFont(15.0f);
+    g.drawText("RHYTHMIC VOLUME SHAPER", 20, 60, 720, 25,
+               juce::Justification::centred);
+
+    juce::Rectangle<float> area(40.0f, 110.0f, 680.0f, 300.0f);
+
+    g.setColour(juce::Colour(35, 39, 49));
+    g.fillRoundedRectangle(area, 8.0f);
+
+    g.setColour(juce::Colour(60, 65, 78));
+
+    for (int i = 1; i < 16; ++i)
+    {
+        float x = area.getX() + area.getWidth() * i / 16.0f;
+        g.drawVerticalLine((int)x, area.getY(), area.getBottom());
+    }
+
+    for (int i = 1; i < 8; ++i)
+    {
+        float y = area.getY() + area.getHeight() * i / 8.0f;
+        g.drawHorizontalLine((int)y, area.getX(), area.getRight());
+    }
+
+    juce::Path curve;
+
+    for (int i = 0; i < 16; ++i)
+    {
+        float x = area.getX() + area.getWidth() * i / 16.0f;
+        float y = area.getBottom()
+                - audioProcessor.volumeCurve[i].load() * area.getHeight();
+
+        if (i == 0)
+            curve.startNewSubPath(x, y);
+        else
+            curve.lineTo(x, y);
+    }
+
+    curve.lineTo(area.getRight(),
+                 area.getBottom()
+                 - audioProcessor.volumeCurve[0].load() * area.getHeight());
+
+    g.setColour(juce::Colour(0, 210, 170));
+    g.strokePath(curve, juce::PathStrokeType(3.0f));
+
+    g.setColour(juce::Colours::white);
+    g.setFont(16.0f);
+    g.drawText("VOLUME ENVELOPE", 40, 415, 680, 25,
+               juce::Justification::centred);
+}
+
+void UltimateShaperAudioProcessorEditor::updateCurveFromMouse(float x, float y)
+{
+    const float left = 40.0f;
+    const float top = 110.0f;
+    const float width = 680.0f;
+    const float height = 300.0f;
+
+    if (x < left || x > left + width || y < top || y > top + height)
+        return;
+
+    int index = juce::jlimit(0, 15, (int)((x - left) / width * 16.0f));
+
+    float value = 1.0f - (y - top) / height;
+
+    audioProcessor.volumeCurve[index].store(
+        juce::jlimit(0.0f, 1.0f, value)
+    );
+
+    repaint();
+}
+
+void UltimateShaperAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
+{
+    updateCurveFromMouse((float)event.x, (float)event.y);
+}
+
+void UltimateShaperAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
+{
+    updateCurveFromMouse((float)event.x, (float)event.y);
+}
+
+void UltimateShaperAudioProcessorEditor::resetCurve()
+{
+    for (auto& point : audioProcessor.volumeCurve)
         point.store(1.0f);
+
+    repaint();
 }
 
-UltimateShaperAudioProcessor::~UltimateShaperAudioProcessor()
+void UltimateShaperAudioProcessorEditor::resized()
 {
-}
-
-void UltimateShaperAudioProcessor::prepareToPlay(double sampleRate, int)
-{
-    currentSampleRate = sampleRate;
-    phase = 0.0;
-}
-
-void UltimateShaperAudioProcessor::releaseResources()
-{
-}
-
-#ifndef JucePlugin_PreferredChannelConfigurations
-bool UltimateShaperAudioProcessor::isBusesLayoutSupported(
-    const BusesLayout& layouts) const
-{
-    return layouts.getMainInputChannelSet()
-        == layouts.getMainOutputChannelSet();
-}
-#endif
-
-float UltimateShaperAudioProcessor::getVolumeAtPhase(float p) const
-{
-    p = juce::jlimit(0.0f, 0.999999f, p);
-
-    float position = p * 16.0f;
-    int index = (int)position;
-    float fraction = position - index;
-
-    float a = volumeCurve[index].load();
-    float b = volumeCurve[(index + 1) % 16].load();
-
-    return a + (b - a) * fraction;
-}
-
-void UltimateShaperAudioProcessor::processBlock(
-    juce::AudioBuffer<float>& buffer,
-    juce::MidiBuffer&)
-{
-    juce::ScopedNoDenormals noDenormals;
-
-    double bpm = 140.0;
-
-    auto* playHead = getPlayHead();
-
-    if (syncEnabled.load() && playHead != nullptr)
-    {
-        if (auto position = playHead->getPosition())
-        {
-            if (auto hostBpm = position->getBpm())
-                bpm = *hostBpm;
-
-            if (auto ppq = position->getPpqPosition())
-            {
-                phase = std::fmod(*ppq, 1.0);
-
-                if (phase < 0.0)
-                    phase += 1.0;
-            }
-        }
-    }
-
-    bpm = juce::jlimit(20.0, 300.0, bpm);
-
-    const double cycleLength = 60.0 / bpm;
-
-    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
-    {
-        float gain = getVolumeAtPhase((float)phase);
-
-        for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
-        {
-            buffer.setSample(
-                channel,
-                sample,
-                buffer.getSample(channel, sample) * gain
-            );
-        }
-
-        phase += 1.0 / (currentSampleRate * cycleLength);
-
-        if (phase >= 1.0)
-            phase -= 1.0;
-    }
-}
-
-juce::AudioProcessorEditor*
-UltimateShaperAudioProcessor::createEditor()
-{
-    return new UltimateShaperAudioProcessorEditor(*this);
-}
-
-bool UltimateShaperAudioProcessor::hasEditor() const
-{
-    return true;
-}
-
-const juce::String UltimateShaperAudioProcessor::getName() const
-{
-    return JucePlugin_Name;
-}
-
-bool UltimateShaperAudioProcessor::acceptsMidi() const { return false; }
-bool UltimateShaperAudioProcessor::producesMidi() const { return false; }
-bool UltimateShaperAudioProcessor::isMidiEffect() const { return false; }
-
-double UltimateShaperAudioProcessor::getTailLengthSeconds() const
-{
-    return 0.0;
-}
-
-int UltimateShaperAudioProcessor::getNumPrograms() { return 1; }
-int UltimateShaperAudioProcessor::getCurrentProgram() { return 0; }
-void UltimateShaperAudioProcessor::setCurrentProgram(int) {}
-
-const juce::String UltimateShaperAudioProcessor::getProgramName(int)
-{
-    return {};
-}
-
-void UltimateShaperAudioProcessor::changeProgramName(
-    int, const juce::String&)
-{
-}
-
-void UltimateShaperAudioProcessor::getStateInformation(
-    juce::MemoryBlock&)
-{
-}
-
-void UltimateShaperAudioProcessor::setStateInformation(
-    const void*, int)
-{
+    resetButton.setBounds(40, 465, 150, 35);
+    syncButton.setBounds(220, 465, 100, 35);
+    bpmLabel.setBounds(400, 465, 320, 35);
 }
