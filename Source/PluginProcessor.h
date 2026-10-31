@@ -1,51 +1,107 @@
 
-#pragma once
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
 
-#include <JuceHeader.h>
-
-class UltimateShaperAudioProcessor : public juce::AudioProcessor
+UltimateShaperAudioProcessorEditor::UltimateShaperAudioProcessorEditor(
+    UltimateShaperAudioProcessor& p)
+    : AudioProcessorEditor(&p), audioProcessor(p)
 {
-public:
+    setSize(760, 500);
+}
 
-    UltimateShaperAudioProcessor();
-    ~UltimateShaperAudioProcessor() override;
+UltimateShaperAudioProcessorEditor::~UltimateShaperAudioProcessorEditor()
+{
+}
 
-    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override;
+void UltimateShaperAudioProcessorEditor::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colour(18, 20, 27));
 
-#ifndef JucePlugin_PreferredChannelConfigurations
-    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
-#endif
+    g.setColour(juce::Colours::white);
+    g.setFont(28.0f);
+    g.drawText("ULTIMATE SHAPER", 20, 15, 720, 45,
+               juce::Justification::centred);
 
-    void processBlock(
-        juce::AudioBuffer<float>&,
-        juce::MidiBuffer&
-    ) override;
+    g.setColour(juce::Colour(120, 125, 140));
+    g.setFont(15.0f);
+    g.drawText("RHYTHMIC VOLUME SHAPER", 20, 60, 720, 25,
+               juce::Justification::centred);
 
-    juce::AudioProcessorEditor* createEditor() override;
-    bool hasEditor() const override;
+    juce::Rectangle<float> area(40.0f, 110.0f, 680.0f, 300.0f);
 
-    const juce::String getName() const override;
+    g.setColour(juce::Colour(35, 39, 49));
+    g.fillRoundedRectangle(area, 8.0f);
 
-    bool acceptsMidi() const override;
-    bool producesMidi() const override;
-    bool isMidiEffect() const override;
+    g.setColour(juce::Colour(60, 65, 78));
 
-    double getTailLengthSeconds() const override;
+    for (int i = 1; i < 16; ++i)
+    {
+        float x = area.getX() + area.getWidth() * i / 16.0f;
+        g.drawVerticalLine((int)x, area.getY(), area.getBottom());
+    }
 
-    int getNumPrograms() override;
-    int getCurrentProgram() override;
-    void setCurrentProgram(int index) override;
-    const juce::String getProgramName(int index) override;
-    void changeProgramName(int index, const juce::String& newName) override;
+    for (int i = 1; i < 8; ++i)
+    {
+        float y = area.getY() + area.getHeight() * i / 8.0f;
+        g.drawHorizontalLine((int)y, area.getX(), area.getRight());
+    }
 
-    void getStateInformation(juce::MemoryBlock& destData) override;
-    void setStateInformation(const void* data, int sizeInBytes) override;
+    juce::Path curve;
 
-private:
+    for (int i = 0; i < 16; ++i)
+    {
+        float x = area.getX() + area.getWidth() * i / 16.0f;
+        float y = area.getBottom()
+                - audioProcessor.volumeCurve[i] * area.getHeight();
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(
-        UltimateShaperAudioProcessor
-    )
-};
+        if (i == 0)
+            curve.startNewSubPath(x, y);
+        else
+            curve.lineTo(x, y);
+    }
 
+    curve.lineTo(area.getRight(),
+                 area.getBottom()
+                 - audioProcessor.volumeCurve[0] * area.getHeight());
+
+    g.setColour(juce::Colour(0, 210, 170));
+    g.strokePath(curve, juce::PathStrokeType(3.0f));
+
+    g.setColour(juce::Colours::white);
+    g.setFont(16.0f);
+    g.drawText("16 STEPS  |  TEMPO SYNC", 40, 435, 680, 30,
+               juce::Justification::centred);
+}
+
+void UltimateShaperAudioProcessorEditor::updateCurveFromMouse(float x, float y)
+{
+    const float left = 40.0f;
+    const float top = 110.0f;
+    const float width = 680.0f;
+    const float height = 300.0f;
+
+    if (x < left || x > left + width || y < top || y > top + height)
+        return;
+
+    int index = juce::jlimit(0, 15, (int)((x - left) / width * 16.0f));
+
+    float value = 1.0f - (y - top) / height;
+
+    audioProcessor.volumeCurve[index] = juce::jlimit(0.0f, 1.0f, value);
+
+    repaint();
+}
+
+void UltimateShaperAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
+{
+    updateCurveFromMouse((float)event.x, (float)event.y);
+}
+
+void UltimateShaperAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
+{
+    updateCurveFromMouse((float)event.x, (float)event.y);
+}
+
+void UltimateShaperAudioProcessorEditor::resized()
+{
+}
