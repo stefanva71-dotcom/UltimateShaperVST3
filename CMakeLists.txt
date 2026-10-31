@@ -31,7 +31,9 @@ juce_add_plugin(UltimateShaper
 
 target_sources(UltimateShaper PRIVATE
     Source/PluginProcessor.cpp
+    Source/PluginProcessor.h
     Source/PluginEditor.cpp
+    Source/PluginEditor.h
 )
 
 target_compile_definitions(UltimateShaper PUBLIC
