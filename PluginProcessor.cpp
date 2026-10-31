@@ -1,3 +1,4 @@
+
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
@@ -57,6 +58,14 @@ void UltimateShaperAudioProcessor::processBlock(
         {
             if (auto hostBpm = position->getBpm())
                 bpm = *hostBpm;
+
+            if (auto ppq = position->getPpqPosition())
+            {
+                phase = std::fmod(*ppq, 1.0);
+
+                if (phase < 0.0)
+                    phase += 1.0;
+            }
         }
     }
 
